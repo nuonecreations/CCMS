@@ -1,0 +1,235 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum ImportStatus {
+  PREVIEW
+  COMPLETED
+  FAILED
+  ROLLED_BACK
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  CALL_OPERATOR
+}
+
+enum CallOutcome {
+  ANSWERED
+  NO_ANSWER
+  BUSY
+  WRONG_NUMBER
+  NUMBER_NOT_AVAILABLE
+  PAYMENT_PROMISED
+  COMPLAINT_RAISED
+  INFORMATION_PROVIDED
+  FOLLOW_UP_REQUIRED
+}
+
+enum CommitmentStatus {
+  PROMISED
+  PAID
+  PARTIALLY_PAID
+  NOT_PAID
+  CANCELLED
+}
+
+enum ComplaintStatus {
+  NEW
+  REGISTERED
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  NORMAL
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+  OVERDUE
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  name      String?
+  role      Role     @default(CALL_OPERATOR)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Worksite {
+  id          Int        @id @default(autoincrement())
+  code        String     @unique
+  nameSi      String     @map("name_si")
+  nameEn      String     @map("name_en")
+  status      Boolean    @default(true)
+  customers   Customer[]
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@map("worksites")
+}
+
+model Customer {
+  id                 Int                  @id @default(autoincrement())
+  accountNumber      String               @unique @map("account_number")
+  regionCode         String               @map("region_code")
+  worksiteCode       String               @map("worksite_code")
+  worksiteId         Int                  @map("worksite_id")
+  customerName       String?              @map("customer_name")
+  address            String?
+  mobileNumber       String?              @map("mobile_number")
+  categoryCode       String?              @map("category_code")
+  worksite            Worksite             @relation(fields: [worksiteId], references: [id])
+  arrearsSnapshots    ArrearsSnapshot[]
+  calls               Call[]
+  commitments        PaymentCommitment[]
+  complaints          Complaint[]
+  followUps           FollowUp[]
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+
+  @@index([worksiteId])
+  @@index([regionCode])
+  @@index([worksiteCode])
+  @@map("customers")
+}
+
+model ArrearsImport {
+  id              Int              @id @default(autoincrement())
+  fileName        String           @map("file_name")
+  reportPeriod     String?          @map("report_period")
+  sourceRegion    String?           @map("source_region")
+  totalRecords    Int              @map("total_records")
+  validRecords    Int              @map("valid_records")
+  invalidRecords  Int              @map("invalid_records")
+  importedBy      String?          @map("imported_by")
+  importedAt      DateTime         @default(now()) @map("imported_at")
+  status          ImportStatus     @default(PREVIEW)
+  snapshots       ArrearsSnapshot[]
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@map("arrears_imports")
+}
+
+model ArrearsSnapshot {
+  id                Int           @id @default(autoincrement())
+  importId          Int           @map("import_id")
+  customerId        Int           @map("customer_id")
+  totalDue          Decimal?      @map("total_due")
+  pendingPayment    Decimal?      @map("pending_payment")
+  arrearsAmount     Decimal?      @map("arrears_amount")
+  lastPaymentDate   DateTime?     @map("last_payment_date")
+  paymentDate       DateTime?     @map("payment_date")
+  snapshotDate      DateTime      @default(now()) @map("snapshot_date")
+  priority          Priority      @default(NORMAL)
+  import            ArrearsImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  customer          Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([importId, customerId])
+  @@index([customerId, snapshotDate])
+  @@index([priority])
+  @@map("arrears_snapshots")
+}
+
+model Call {
+  id               Int              @id @default(autoincrement())
+  customerId       Int              @map("customer_id")
+  callDate         DateTime         @default(now()) @map("call_date")
+  callType         String           @map("call_type")
+  callOutcome      CallOutcome
+  notes            String?
+  customerResponse String?          @map("customer_response")
+  assignedSection  String?          @map("assigned_section")
+  finalStatus      String           @default("OPEN") @map("final_status")
+  nextFollowupDate DateTime?        @map("next_followup_date")
+  customer         Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  commitments      PaymentCommitment[]
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  @@index([customerId, callDate])
+  @@map("calls")
+}
+
+model PaymentCommitment {
+  id              Int              @id @default(autoincrement())
+  customerId      Int              @map("customer_id")
+  callId          Int?             @map("call_id")
+  promisedAmount  Decimal          @map("promised_amount")
+  promiseDate     DateTime         @map("promise_date")
+  status          CommitmentStatus @default(PROMISED)
+  actualPaymentDate DateTime?      @map("actual_payment_date")
+  notes           String?
+  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  call            Call?            @relation(fields: [callId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, status])
+  @@index([promiseDate, status])
+  @@map("payment_commitments")
+}
+
+model Complaint {
+  id              Int              @id @default(autoincrement())
+  complaintNumber String           @unique @map("complaint_number")
+  customerId      Int              @map("customer_id")
+  category        String
+  description     String
+  priority        Priority         @default(NORMAL)
+  assignedTo      String?          @map("assigned_to")
+  status          ComplaintStatus  @default(NEW)
+  createdAt       DateTime         @default(now()) @map("created_at")
+  resolvedAt      DateTime?        @map("resolved_at")
+  customer        Customer         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, status])
+  @@index([status, priority])
+  @@map("complaints")
+}
+
+model FollowUp {
+  id            Int            @id @default(autoincrement())
+  customerId    Int            @map("customer_id")
+  referenceType String         @map("reference_type")
+  referenceId   Int            @map("reference_id")
+  followupDate  DateTime       @map("followup_date")
+  assignedTo    String?        @map("assigned_to")
+  status        FollowUpStatus @default(PENDING)
+  notes         String?
+  completedAt   DateTime?      @map("completed_at")
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([followupDate, status])
+  @@map("follow_ups")
+}
+
+model ImportRowError {
+  id          Int          @id @default(autoincrement())
+  importId    Int          @map("import_id")
+  rowNumber   Int           @map("row_number")
+  accountNo   String?      @map("account_no")
+  errorCode   String       @map("error_code")
+  message     String
+  rawData     String?      @map("raw_data")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@index([importId])
+  @@map("import_row_errors")
+}
