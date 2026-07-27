@@ -1,16 +1,23 @@
 services:
-  postgres:
-    image: postgres:16
-    container_name: ccms-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ccms
-      POSTGRES_PASSWORD: ccms_dev_password
-      POSTGRES_DB: ccms
-    ports:
-      - "5432:5432"
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: ccms_api
+    restart: always
     volumes:
-      - ccms_postgres_data:/var/lib/postgresql/data
+      - ./apps/api/prisma:/app/apps/api/prisma
+    environment:
+      - DATABASE_URL=file:./dev.db
+      - JWT_SECRET=ccms_secret_key_change_in_production
 
-volumes:
-  ccms_postgres_data:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: ccms_web
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api
