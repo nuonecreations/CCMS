@@ -36,3 +36,22 @@ Optional API URL:
 ```bash
 VITE_API_BASE_URL=http://localhost:3000
 ```
+
+## Azure deployment
+
+This repo is configured to deploy to Azure App Service via GitHub Actions.
+
+1. Push to `main`.
+2. The workflow `.github/workflows/main_nwsdbcallcenter.yml` will:
+   - checkout the repo
+   - run `npm ci`
+   - run `npm run build`
+   - log in to Azure using configured secrets
+   - deploy the app to `nwsdbcallcenter`
+
+The app is served from the Nest API at `/`, and the frontend calls the API under `/api` in production.
+
+If you need to run locally with Azure-style startup:
+```bash
+npm start
+```

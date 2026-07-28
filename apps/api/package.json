@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "start:dev": "nest start --watch",
-    "build": "nest build",
+    "start:prod": "node dist/main.js",
+    "build": "prisma generate && nest build",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts"
@@ -15,6 +16,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/serve-static": "^5.0.0",
     "@prisma/client": "^6.0.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
